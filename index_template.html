@@ -340,7 +340,8 @@
         const ADDITIONAL_POINT = {{ADDITIONAL_POINT_JSON}};
 
         async function initMap() {
-            map = L.map('map').setView([TARGET_STOP.lat, TARGET_STOP.lon], 14);
+            // Create map without initial center/zoom
+            map = L.map('map');
 
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '© OpenStreetMap contributors'
@@ -371,6 +372,13 @@
             }).addTo(map);
 
             additionalMarker.bindPopup(`<b>${ADDITIONAL_POINT.name}</b><br>ID: ${ADDITIONAL_POINT.id}<br>Lat: ${ADDITIONAL_POINT.lat}<br>Lon: ${ADDITIONAL_POINT.lon}`);
+
+            // Center map on both markers
+            const bounds = L.latLngBounds([
+                [TARGET_STOP.lat, TARGET_STOP.lon],
+                [ADDITIONAL_POINT.lat, ADDITIONAL_POINT.lon]
+            ]);
+            map.fitBounds(bounds, {padding: [20, 20]});
         }
 
         function createScheduleTable(patternId) {
