@@ -17,10 +17,20 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Add security middleware
-app.add_middleware(TrustedHostMiddleware, allowed_hosts=["localhost", "127.0.0.1"])
+import os
+allowed_hosts = ["localhost", "127.0.0.1"]
+# Add Render domain if deployed
+if os.getenv("RENDER"):
+    allowed_hosts.append("*")  # Allow all hosts on Render
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=allowed_hosts)
+cors_origins = ["http://localhost:8000", "http://127.0.0.1:8000"]
+# Allow all origins on Render for simplicity
+if os.getenv("RENDER"):
+    cors_origins = ["*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8000", "http://127.0.0.1:8000"],
+    allow_origins=cors_origins,
     allow_credentials=False,
     allow_methods=["GET"],
     allow_headers=["*"],
@@ -520,5 +530,7 @@ async def index():
     """
 
 if __name__ == "__main__":
-    print("Starting Carris Bus Tracker on http://localhost:8000")
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    port = int(os.getenv("PORT", 8000))
+    host = "0.0.0.0"
+    print(f"Starting Carris Bus Tracker on http://localhost:{port}")
+    uvicorn.run(app, host=host, port=port)
