@@ -59,6 +59,26 @@ FILTER_CRITERIA = {
     "line_ids": ["1603", "1636", "1637"]
 }
 
+# Schedule data for ESCOLA stop
+SCHEDULES = {
+    "1603_0_2": {
+        "line": "1603",
+        "times": ["6:12", "6:52", "7:32", "8:22", "9:07", "9:52", "11:12", "12:37", "14:02", "15:22", "16:47", "17:37", "18:22", "19:12", "19:52"]
+    },
+    "1636_0_1": {
+        "line": "1636",
+        "times": ["7:40", "8:40", "10:50", "12:50", "14:50", "16:50", "19:00", "20:15"]
+    },
+    "1636_1_1": {
+        "line": "1636",
+        "times": ["6:32", "7:07", "8:07", "10:12", "12:18", "14:17", "16:17", "17:17", "18:22", "19:42"]
+    },
+    "1637_0_1": {
+        "line": "1637",
+        "times": ["7:13", "8:04", "9:14", "12:04", "13:21", "15:21", "17:04", "18:04", "19:14"]
+    }
+}
+
 def validate_coordinate(value, coord_type: str = "coordinate") -> Optional[float]:
     """Validate and sanitize coordinate values"""
     try:
@@ -263,271 +283,25 @@ async def get_buses():
 @app.get("/", response_class=HTMLResponse)
 async def index():
     """Main page with bus tracking interface"""
-    return f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Carris Bus Tracker</title>
-        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-        <style>
-            body {{ font-family: Arial, sans-serif; margin: 20px; }}
-            .container {{ display: flex; gap: 20px; }}
-            .map-container {{ flex: 1; }}
-            .info-container {{ flex: 1; min-width: 400px; }}
-            #map {{ height: 600px; width: 100%; border: 1px solid #ccc; border-radius: 8px; }}
-            .bus-item {{
-                transition: all 0.3s ease;
-                border: 1px solid #ccc;
-                margin: 10px 0;
-                padding: 15px;
-                border-radius: 8px;
-            }}
-            .bus-item:hover {{ box-shadow: 0 2px 8px rgba(0,0,0,0.1); }}
-            .heading-towards {{ background: #e8f5e8; }}
-            .not-heading {{ background: #f5f5f5; }}
-            #last-update {{ color: #666; font-size: 0.9em; margin-top: 20px; }}
-            h1 {{ color: #333; }}
-            .legend {{
-                background: white;
-                padding: 10px;
-                border-radius: 5px;
-                border: 1px solid #ccc;
-                margin-bottom: 10px;
-            }}
-            .legend-item {{ margin: 5px 0; }}
-            .legend-color {{
-                display: inline-block;
-                width: 20px;
-                height: 20px;
-                margin-right: 10px;
-                border-radius: 50%;
-                vertical-align: middle;
-            }}
-        </style>
-    </head>
-    <body>
-        <h1>Carris Bus Tracker - Lines 1603, 1636, 1637</h1>
-        <p>Tracking buses heading to stop {sanitize_string(TARGET_STOP['name'])} - ID {sanitize_string(str(TARGET_STOP['id']))} (Lat: {TARGET_STOP['lat']}, Lon: {TARGET_STOP['lon']})</p>
-        <p>Additional point: {sanitize_string(ADDITIONAL_POINT['name'])} - ID {sanitize_string(str(ADDITIONAL_POINT['id']))} (Lat: {ADDITIONAL_POINT['lat']}, Lon: {ADDITIONAL_POINT['lon']})</p>
-        <p>Filters: Lines 1603, 1636, 1637 - Routes 1603_0, 1636_0, 1636_1, 1637_0</p>
+    # Read HTML template
+    with open('index_template.html', 'r', encoding='utf-8') as f:
+        template = f.read()
 
-        <div class="container">
-            <div class="map-container">
-                <div id="map"></div>
-            </div>
-            <div class="info-container">
-                <div class="legend">
-                    <div class="legend-item">
-                        <span class="legend-color" style="background-color: #ff4444;"></span>
-                        {TARGET_STOP['name']} (110004)
-                    </div>
-                    <div class="legend-item">
-                        <span class="legend-color" style="background-color: #4444ff;"></span>
-                        R Principal 146 (171577)
-                    </div>
-                    <div class="legend-item">
-                        <span class="legend-color" style="background-color: #ff8800;"></span>
-                        Bus heading to stop 110004
-                    </div>
-                    <div class="legend-item">
-                        <span class="legend-color" style="background-color: #B8860B;"></span>
-                        Bus between stops 110004-171577
-                    </div>
-                </div>
-                <div id="buses-container"></div>
-                <p id="last-update"></p>
-            </div>
-        </div>
+    # Replace placeholders with sanitized data
+    import json
+    html_content = template.replace(
+        '{{TARGET_STOP_NAME}}', sanitize_string(TARGET_STOP['name'])
+    ).replace(
+        '{{TARGET_STOP_ID}}', sanitize_string(str(TARGET_STOP['id']))
+    ).replace(
+        '{{SCHEDULES_JSON}}', json.dumps(SCHEDULES)
+    ).replace(
+        '{{TARGET_STOP_JSON}}', json.dumps(TARGET_STOP)
+    ).replace(
+        '{{ADDITIONAL_POINT_JSON}}', json.dumps(ADDITIONAL_POINT)
+    )
 
-        <script>
-            let map;
-            let busMarkers = {{}};
-            let targetMarker;
-            let additionalMarker;
-
-            // Initialize map
-            async function initMap() {{
-                // Center map between both points
-                const centerLat = ({TARGET_STOP['lat']} + {ADDITIONAL_POINT['lat']}) / 2;
-                const centerLon = ({TARGET_STOP['lon']} + {ADDITIONAL_POINT['lon']}) / 2;
-                map = L.map('map').setView([centerLat, centerLon], 13);
-
-                // Add tile layer
-                L.tileLayer('https://{{s}}.tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png', {{
-                    attribution: '© OpenStreetMap contributors'
-                }}).addTo(map);
-
-
-                // Add target stop marker (higher layer)
-                targetMarker = L.marker([{TARGET_STOP['lat']}, {TARGET_STOP['lon']}], {{
-                    icon: L.divIcon({{
-                        className: 'target-marker',
-                        html: '<div style="background-color: #ff4444; width: 20px; height: 20px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3); z-index: 1000;"></div>',
-                        iconSize: [26, 26],
-                        iconAnchor: [13, 13]
-                    }}),
-                    zIndexOffset: 1000
-                }}).addTo(map);
-
-                targetMarker.bindPopup(`<b>{TARGET_STOP['name']}</b><br>ID: {TARGET_STOP['id']}<br>Lat: {TARGET_STOP['lat']}<br>Lon: {TARGET_STOP['lon']}`);
-
-                // Add additional point marker (higher layer)
-                additionalMarker = L.marker([{ADDITIONAL_POINT['lat']}, {ADDITIONAL_POINT['lon']}], {{
-                    icon: L.divIcon({{
-                        className: 'additional-marker',
-                        html: '<div style="background-color: #4444ff; width: 20px; height: 20px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3); z-index: 1000;"></div>',
-                        iconSize: [26, 26],
-                        iconAnchor: [13, 13]
-                    }}),
-                    zIndexOffset: 1000
-                }}).addTo(map);
-
-                additionalMarker.bindPopup(`<b>{ADDITIONAL_POINT['name']}</b><br>ID: {ADDITIONAL_POINT['id']}<br>Lat: {ADDITIONAL_POINT['lat']}<br>Lon: {ADDITIONAL_POINT['lon']}`);
-            }}
-
-
-
-            async function updateBuses() {{
-                try {{
-                    const response = await fetch('/api/buses');
-                    const buses = await response.json();
-
-                    // Update info panel
-                    const container = document.getElementById('buses-container');
-                    container.innerHTML = '';
-
-                    // Clear existing bus markers
-                    Object.values(busMarkers).forEach(marker => map.removeLayer(marker));
-                    busMarkers = {{}};
-
-                    if (buses.length === 0) {{
-                        container.innerHTML = '<p>No buses found matching criteria</p>';
-                        return;
-                    }}
-
-                    // Calculate map bounds to fit all buses
-                    let busLatitudes = [];
-                    let busLongitudes = [];
-
-                    buses.forEach(bus => {{
-                        busLatitudes.push(bus.lat);
-                        busLongitudes.push(bus.lon);
-                    }});
-
-                    // Center map on buses if there are any
-                    if (busLatitudes.length > 0) {{
-                        const centerLat = busLatitudes.reduce((a, b) => a + b) / busLatitudes.length;
-                        const centerLon = busLongitudes.reduce((a, b) => a + b) / busLongitudes.length;
-
-                        // Create bounds that include all buses
-                        const minLat = Math.min(...busLatitudes);
-                        const maxLat = Math.max(...busLatitudes);
-                        const minLon = Math.min(...busLongitudes);
-                        const maxLon = Math.max(...busLongitudes);
-
-                        // Add padding to the bounds
-                        const latPadding = (maxLat - minLat) * 0.2 || 0.01;
-                        const lonPadding = (maxLon - minLon) * 0.2 || 0.01;
-
-                        const bounds = [
-                            [minLat - latPadding, minLon - lonPadding],
-                            [maxLat + latPadding, maxLon + lonPadding]
-                        ];
-
-                        map.fitBounds(bounds);
-                    }}
-
-                    buses.forEach(bus => {{
-                        // Update info panel
-                        const busDiv = document.createElement('div');
-                        busDiv.className = `bus-item ${{bus.status === 'heading_to_target' ? 'heading-towards' : 'between-stops'}}`;
-
-                        const etaText = bus.eta_minutes ?
-                            `<strong>ETA: ${{bus.eta_minutes}} minutes</strong>` :
-                            'Not heading to target or no speed data';
-
-                        busDiv.innerHTML = `
-                            <h3>Bus ${{bus.id}}</h3>
-                            <p><strong>Location:</strong> ${{bus.lat.toFixed(6)}}, ${{bus.lon.toFixed(6)}}</p>
-                            <p><strong>Speed:</strong> ${{bus.speed.toFixed(1)}} km/h</p>
-                            <p><strong>Bearing:</strong> ${{bus.bearing}}°</p>
-                            <p><strong>Distance to target:</strong> ${{bus.distance_to_target}} km</p>
-                            <p><strong>Status:</strong> ${{bus.status === 'heading_to_target' ? 'Heading to stop 110004' : 'Between stops 110004-171577'}}</p>
-                            <p><strong>Current Stop Sequence:</strong> ${{bus.current_stop_sequence || 'N/A'}}</p>
-                            <p><strong>Target Stop Sequence:</strong> ${{bus.target_stop_sequence || 'N/A'}}</p>
-                            <p>${{etaText}}</p>
-                            <p><strong>Status:</strong> ${{bus.current_status || 'Unknown'}}</p>
-                        `;
-                        container.appendChild(busDiv);
-
-                        // Add bus marker to map
-                        const markerColor = bus.color || '#000000';
-                        const marker = L.marker([bus.lat, bus.lon], {{
-                            icon: L.divIcon({{
-                                className: 'bus-marker',
-                                html: `
-                                    <div style="
-                                        background-color: ${{markerColor}};
-                                        width: 32px;
-                                        height: 32px;
-                                        border-radius: 50%;
-                                        border: 4px solid white;
-                                        box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-                                        position: relative;
-                                        z-index: 2000;
-                                    ">
-                                        <div style="
-                                            position: absolute;
-                                            top: -16px;
-                                            left: 50%;
-                                            transform: translateX(-50%) rotate(${{bus.bearing}}deg);
-                                            width: 0;
-                                            height: 0;
-                                            border-left: 8px solid transparent;
-                                            border-right: 8px solid transparent;
-                                            border-bottom: 24px solid ${{markerColor}};
-                                        "></div>
-                                    </div>
-                                `,
-                                iconSize: [40, 40],
-                                iconAnchor: [20, 20]
-                            }}),
-                            zIndexOffset: 2000
-                        }}).addTo(map);
-
-                        const popupContent = `
-                            <b>Bus ${{bus.id}}</b><br>
-                            Speed: ${{bus.speed.toFixed(1)}} km/h<br>
-                            Bearing: ${{bus.bearing}}°<br>
-                            Distance: ${{bus.distance_to_target}} km<br>
-                            ${{bus.eta_minutes ? `ETA: ${{bus.eta_minutes}} min` : 'No ETA available'}}
-                        `;
-                        marker.bindPopup(popupContent);
-
-                        busMarkers[bus.id] = marker;
-                    }});
-
-                    document.getElementById('last-update').textContent =
-                        `Last updated: ${{new Date().toLocaleTimeString()}}`;
-
-                }} catch (error) {{
-                    console.error('Error updating buses:', error);
-                    document.getElementById('buses-container').innerHTML =
-                        '<p style="color: red;">Error loading bus data</p>';
-                }}
-            }}
-
-            // Initialize everything when page loads
-            document.addEventListener('DOMContentLoaded', async function() {{
-                await initMap();
-                updateBuses();
-                setInterval(updateBuses, 30000);
-            }});
-        </script>
-    </body>
-    </html>
-    """
+    return html_content
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8000))

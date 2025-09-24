@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Carris Bus Tracker - ESCOLA Stop</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            height: 100vh;
+            overflow: hidden;
+            background: #f5f5f5;
+        }
+
+        .header {
+            background: #2c3e50;
+            color: white;
+            padding: 10px 15px;
+            text-align: center;
+            position: relative;
+            z-index: 1000;
+        }
+
+        .header h1 {
+            font-size: 1.2em;
+            margin-bottom: 3px;
+        }
+
+        .header p {
+            font-size: 0.8em;
+            opacity: 0.9;
+            margin: 2px 0;
+        }
+
+        .main-container {
+            display: flex;
+            height: calc(100vh - 100px);
+            gap: 10px;
+            padding: 5px;
+        }
+
+        .map-container {
+            flex: 1;
+            min-height: 0;
+        }
+
+        .sidebar {
+            width: 320px;
+            overflow-y: auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        #map {
+            height: 100%;
+            width: 100%;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .legend {
+            background: #34495e;
+            color: white;
+            padding: 10px;
+            border-radius: 8px 8px 0 0;
+        }
+
+        .legend-item {
+            margin: 3px 0;
+            font-size: 0.85em;
+            display: flex;
+            align-items: center;
+        }
+
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            margin-right: 8px;
+            border-radius: 50%;
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+
+        .bus-section {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .bus-section h4 {
+            color: #2c3e50;
+            margin-bottom: 8px;
+            font-size: 0.9em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .pattern-badge {
+            background: #3498db;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-size: 0.7em;
+            font-weight: normal;
+        }
+
+        .schedule-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 6px 0;
+            font-size: 0.75em;
+        }
+
+        .schedule-table th {
+            background: #ecf0f1;
+            padding: 4px 6px;
+            text-align: left;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .schedule-table td {
+            padding: 2px 6px;
+            border-bottom: 1px solid #f8f9fa;
+        }
+
+        .schedule-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 3px;
+            margin: 6px 0;
+        }
+
+        .schedule-time {
+            background: #f8f9fa;
+            padding: 3px 5px;
+            border-radius: 3px;
+            text-align: center;
+            font-size: 0.75em;
+            font-family: monospace;
+            border: 1px solid #e9ecef;
+        }
+
+        .bus-item {
+            margin: 6px 0;
+            padding: 8px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            border-left: 3px solid;
+            font-size: 0.8em;
+        }
+
+        .bus-heading { border-left-color: #ff8800; }
+        .bus-between { border-left-color: #B8860B; }
+
+        .bus-item strong {
+            display: block;
+            margin-bottom: 3px;
+            color: #2c3e50;
+        }
+
+        .bus-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4px;
+            font-size: 0.75em;
+            color: #666;
+        }
+
+        .bus-info span {
+            padding: 1px 0;
+        }
+
+        #last-update {
+            color: #666;
+            font-size: 0.7em;
+            padding: 8px;
+            text-align: center;
+            background: #f8f9fa;
+            margin-top: auto;
+        }
+
+        .no-buses {
+            padding: 15px;
+            text-align: center;
+            color: #666;
+            font-style: italic;
+        }
+
+        /* Responsive design */
+        @media (max-width: 768px) {
+            .main-container {
+                flex-direction: column;
+                height: calc(100vh - 80px);
+            }
+
+            .sidebar {
+                width: 100%;
+                height: 40%;
+                min-height: 250px;
+            }
+
+            .map-container {
+                height: 60%;
+            }
+
+            .header h1 { font-size: 1em; }
+            .header p { font-size: 0.7em; }
+
+            .schedule-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        @media (max-width: 480px) {
+            .schedule-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .bus-info {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🚌 Carris Bus Tracker - ESCOLA Stop</h1>
+        <p>Real-time tracking for Lines 1603, 1636, 1637</p>
+        <p>Target: {{TARGET_STOP_NAME}} (ID: {{TARGET_STOP_ID}})</p>
+    </div>
+
+    <div class="main-container">
+        <div class="map-container">
+            <div id="map"></div>
+        </div>
+
+        <div class="sidebar">
+            <div class="legend">
+                <div class="legend-item">
+                    <span class="legend-color" style="background-color: #ff4444;"></span>
+                    ESCOLA Stop (110004)
+                </div>
+                <div class="legend-item">
+                    <span class="legend-color" style="background-color: #4444ff;"></span>
+                    R Principal 146 (171577)
+                </div>
+                <div class="legend-item">
+                    <span class="legend-color" style="background-color: #ff8800;"></span>
+                    Bus heading to ESCOLA
+                </div>
+                <div class="legend-item">
+                    <span class="legend-color" style="background-color: #B8860B;"></span>
+                    Bus between stops
+                </div>
+            </div>
+
+            <div id="bus-sections">
+                <!-- Bus sections will be populated by JavaScript -->
+            </div>
+
+            <div id="last-update"></div>
+        </div>
+    </div>
+
+    <script>
+        let map;
+        let busMarkers = {};
+        let targetMarker;
+        let additionalMarker;
+
+        const SCHEDULES = {{SCHEDULES_JSON}};
+        const TARGET_STOP = {{TARGET_STOP_JSON}};
+        const ADDITIONAL_POINT = {{ADDITIONAL_POINT_JSON}};
+
+        async function initMap() {
+            map = L.map('map').setView([TARGET_STOP.lat, TARGET_STOP.lon], 14);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+
+            // Add target stop marker
+            targetMarker = L.marker([TARGET_STOP.lat, TARGET_STOP.lon], {
+                icon: L.divIcon({
+                    className: 'target-marker',
+                    html: '<div style="background-color: #ff4444; width: 24px; height: 24px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3); z-index: 1000;"></div>',
+                    iconSize: [30, 30],
+                    iconAnchor: [15, 15]
+                }),
+                zIndexOffset: 1000
+            }).addTo(map);
+
+            targetMarker.bindPopup(`<b>ESCOLA Stop</b><br>ID: ${TARGET_STOP.id}<br>Lat: ${TARGET_STOP.lat}<br>Lon: ${TARGET_STOP.lon}`);
+
+            // Add additional point marker
+            additionalMarker = L.marker([ADDITIONAL_POINT.lat, ADDITIONAL_POINT.lon], {
+                icon: L.divIcon({
+                    className: 'additional-marker',
+                    html: '<div style="background-color: #4444ff; width: 20px; height: 20px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3); z-index: 1000;"></div>',
+                    iconSize: [26, 26],
+                    iconAnchor: [13, 13]
+                }),
+                zIndexOffset: 1000
+            }).addTo(map);
+
+            additionalMarker.bindPopup(`<b>${ADDITIONAL_POINT.name}</b><br>ID: ${ADDITIONAL_POINT.id}<br>Lat: ${ADDITIONAL_POINT.lat}<br>Lon: ${ADDITIONAL_POINT.lon}`);
+        }
+
+        function createScheduleTable(patternId) {
+            const schedule = SCHEDULES[patternId];
+            if (!schedule) return '';
+
+            return `
+                <div class="schedule-grid">
+                    ${schedule.times.map(time => `<div class="schedule-time">${time}</div>`).join('')}
+                </div>
+            `;
+        }
+
+        async function loadBusData() {
+            try {
+                const response = await fetch('/api/buses');
+                const buses = await response.json();
+
+                // Clear existing bus markers
+                Object.values(busMarkers).forEach(marker => map.removeLayer(marker));
+                busMarkers = {};
+
+                const busContainer = document.getElementById('bus-sections');
+
+                // Group buses by pattern
+                const busesByPattern = {};
+                buses.forEach(bus => {
+                    if (!busesByPattern[bus.pattern_id]) {
+                        busesByPattern[bus.pattern_id] = [];
+                    }
+                    busesByPattern[bus.pattern_id].push(bus);
+                });
+
+                // Create sections for each pattern
+                const patterns = ['1603_0_2', '1636_0_1', '1636_1_1', '1637_0_1'];
+                let sectionsHTML = '';
+
+                patterns.forEach(patternId => {
+                    const patternBuses = busesByPattern[patternId] || [];
+                    const schedule = SCHEDULES[patternId];
+
+                    sectionsHTML += `
+                        <div class="bus-section">
+                            <h4>
+                                Line ${schedule ? schedule.line : patternId.split('_')[0]}
+                                <span class="pattern-badge">${patternId}</span>
+                            </h4>
+
+                            <div class="schedule-table">
+                                <strong style="font-size: 0.8em; color: #666; margin-bottom: 4px; display: block;">📅 Scheduled Times to ESCOLA:</strong>
+                                ${createScheduleTable(patternId)}
+                            </div>
+
+                            <div style="margin-top: 8px;">
+                                <strong style="font-size: 0.8em; color: #666; margin-bottom: 4px; display: block;">🚌 Live Buses (${patternBuses.length}):</strong>
+                                ${patternBuses.length === 0 ?
+                                    '<div class="no-buses">No live buses</div>' :
+                                    patternBuses.map(bus => `
+                                        <div class="bus-item ${bus.status === 'heading_to_target' ? 'bus-heading' : 'bus-between'}">
+                                            <strong>Bus ${bus.vehicle_id} • Line ${bus.line_id}</strong>
+                                            <div class="bus-info">
+                                                <span>Status: ${bus.status === 'heading_to_target' ? '→ ESCOLA' : '↔ Between stops'}</span>
+                                                <span>Speed: ${bus.speed || 0} km/h</span>
+                                                <span>Distance: ${bus.distance_to_target ? bus.distance_to_target + ' km' : 'N/A'}</span>
+                                                <span>${bus.eta_minutes ? 'ETA: ' + Math.round(bus.eta_minutes) + ' min' : 'No ETA'}</span>
+                                            </div>
+                                        </div>
+                                    `).join('')
+                                }
+                            </div>
+                        </div>
+                    `;
+                });
+
+                busContainer.innerHTML = sectionsHTML;
+
+                // Add bus markers to map
+                buses.forEach(bus => {
+                    const markerColor = bus.color || '#000000';
+
+                    const marker = L.marker([parseFloat(bus.lat), parseFloat(bus.lon)], {
+                        icon: L.divIcon({
+                            className: 'bus-marker',
+                            html: `<div style="
+                                background-color: ${markerColor};
+                                width: 32px;
+                                height: 32px;
+                                border-radius: 50%;
+                                border: 3px solid white;
+                                box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+                                display: flex;
+                                align-items: center;
+                                justify-content: center;
+                                color: white;
+                                font-weight: bold;
+                                font-size: 11px;
+                                z-index: 500;
+                            ">${bus.line_id}</div>`,
+                            iconSize: [38, 38],
+                            iconAnchor: [19, 19]
+                        }),
+                        zIndexOffset: 500
+                    }).addTo(map);
+
+                    marker.bindPopup(`
+                        <b>🚌 Bus ${bus.vehicle_id}</b><br>
+                        <strong>Line:</strong> ${bus.line_id}<br>
+                        <strong>Pattern:</strong> ${bus.pattern_id}<br>
+                        <strong>Speed:</strong> ${bus.speed} km/h<br>
+                        <strong>Distance:</strong> ${bus.distance_to_target} km<br>
+                        ${bus.eta_minutes ? '<strong>ETA:</strong> ' + Math.round(bus.eta_minutes) + ' min<br>' : ''}
+                        <strong>Status:</strong> ${bus.status === 'heading_to_target' ? 'Heading to ESCOLA' : 'Between stops'}
+                    `);
+
+                    busMarkers[bus.id] = marker;
+                });
+
+                // Center map on buses if any exist
+                if (buses.length > 0) {
+                    const bounds = L.latLngBounds(buses.map(bus => [bus.lat, bus.lon]));
+                    bounds.extend([TARGET_STOP.lat, TARGET_STOP.lon]);
+                    bounds.extend([ADDITIONAL_POINT.lat, ADDITIONAL_POINT.lon]);
+                    map.fitBounds(bounds, {padding: [20, 20]});
+                }
+
+                document.getElementById('last-update').textContent = `🕐 Last updated: ${new Date().toLocaleTimeString()}`;
+            } catch (error) {
+                console.error('Error loading bus data:', error);
+                document.getElementById('bus-sections').innerHTML = '<div class="no-buses">Error loading bus data. Please refresh.</div>';
+            }
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            initMap();
+            loadBusData();
+            setInterval(loadBusData, 30000); // Refresh every 30 seconds
+        });
+    </script>
+</body>
+</html>
