@@ -149,6 +149,14 @@
             font-weight: 500;
         }
 
+        .schedule-time.next-bus {
+            background: #28a745;
+            color: white;
+            border-color: #1e7e34;
+            font-weight: 600;
+            box-shadow: 0 2px 4px rgba(40, 167, 69, 0.3);
+        }
+
         .bus-item {
             margin: 6px 0;
             padding: 8px;
@@ -324,9 +332,29 @@
             const schedule = SCHEDULES[patternId];
             if (!schedule) return '';
 
+            const now = new Date();
+            const currentTimeMinutes = now.getHours() * 60 + now.getMinutes();
+
+            // Convert schedule times to minutes and find next bus
+            const scheduleMinutes = schedule.times.map(time => {
+                const [hours, minutes] = time.split(':').map(Number);
+                return hours * 60 + minutes;
+            });
+
+            // Find next bus (first time after current time)
+            let nextBusIndex = scheduleMinutes.findIndex(timeMinutes => timeMinutes > currentTimeMinutes);
+
+            // If no more buses today, highlight the first one (tomorrow's first bus)
+            if (nextBusIndex === -1) {
+                nextBusIndex = 0;
+            }
+
             return `
                 <div class="schedule-grid">
-                    ${schedule.times.map(time => `<div class="schedule-time">${time}</div>`).join('')}
+                    ${schedule.times.map((time, index) => {
+                        const isNextBus = index === nextBusIndex;
+                        return `<div class="schedule-time${isNextBus ? ' next-bus' : ''}">${time}</div>`;
+                    }).join('')}
                 </div>
             `;
         }
