@@ -28,6 +28,18 @@
             z-index: 1000;
         }
 
+        .refresh-countdown {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            font-size: 0.8em;
+            opacity: 0.9;
+            background: rgba(255,255,255,0.1);
+            padding: 4px 8px;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
         .header h1 {
             font-size: 1.2em;
             margin-bottom: 3px;
@@ -224,6 +236,11 @@
             .header h1 { font-size: 1em; }
             .header p { font-size: 0.7em; }
 
+            .refresh-countdown {
+                font-size: 0.7em;
+                padding: 3px 6px;
+            }
+
             .schedule-grid {
                 grid-template-columns: repeat(3, 1fr);
             }
@@ -242,6 +259,7 @@
 </head>
 <body>
     <div class="header">
+        <div class="refresh-countdown" id="refresh-countdown">⟳ 30s</div>
         <h1>🚌 Carris Bus Tracker - ESCOLA Stop</h1>
         <p>Real-time tracking for Lines 1603, 1636, 1637</p>
         <p>Target: {{TARGET_STOP_NAME}} (ID: {{TARGET_STOP_ID}})</p>
@@ -495,11 +513,40 @@
             }
         }
 
+        // Countdown timer
+        let countdownSeconds = 30;
+        let countdownInterval;
+
+        function startCountdown() {
+            countdownSeconds = 30;
+            const countdownElement = document.getElementById('refresh-countdown');
+
+            countdownInterval = setInterval(() => {
+                countdownSeconds--;
+                countdownElement.textContent = `⟳ ${countdownSeconds}s`;
+
+                if (countdownSeconds <= 0) {
+                    countdownElement.textContent = '⟳ Loading...';
+                    clearInterval(countdownInterval);
+                }
+            }, 1000);
+        }
+
+        function resetCountdown() {
+            clearInterval(countdownInterval);
+            startCountdown();
+        }
+
+        async function loadBusDataWithCountdown() {
+            await loadBusData();
+            resetCountdown();
+        }
+
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
             initMap();
-            loadBusData();
-            setInterval(loadBusData, 30000); // Refresh every 30 seconds
+            loadBusDataWithCountdown();
+            setInterval(loadBusDataWithCountdown, 30000); // Refresh every 30 seconds
         });
     </script>
 </body>
