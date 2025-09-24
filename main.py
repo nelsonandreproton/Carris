@@ -248,6 +248,24 @@ async def fetch_bus_data() -> List[Dict]:
                             )
                             eta_minutes = None
 
+                        # Check if bus has passed the additional point (171577)
+                        elif (additional_sequence is not None and
+                              current_sequence >= additional_sequence):
+                            bus_status = "passed_stops"
+                            color = "#000000"  # black
+
+                            bus_lat = validate_coordinate(bus.get("lat"), "lat")
+                            bus_lon = validate_coordinate(bus.get("lon"), "lon")
+
+                            if bus_lat is None or bus_lon is None:
+                                continue  # Skip buses with invalid coordinates
+
+                            distance = calculate_distance(
+                                bus_lat, bus_lon,
+                                TARGET_STOP["lat"], TARGET_STOP["lon"]
+                            )
+                            eta_minutes = None
+
                         # Only add buses that meet our criteria
                         if bus_status:
                             bus_data = {

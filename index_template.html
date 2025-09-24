@@ -159,6 +159,7 @@
 
         .bus-heading { border-left-color: #ff8800; }
         .bus-between { border-left-color: #B8860B; }
+        .bus-passed { border-left-color: #000000; }
 
         .bus-item strong {
             display: block;
@@ -259,6 +260,10 @@
                 <div class="legend-item">
                     <span class="legend-color" style="background-color: #B8860B;"></span>
                     Bus between stops
+                </div>
+                <div class="legend-item">
+                    <span class="legend-color" style="background-color: #000000;"></span>
+                    Bus passed R Principal 146
                 </div>
             </div>
 
@@ -369,17 +374,30 @@
                                 <strong style="font-size: 0.8em; color: #666; margin-bottom: 4px; display: block;">🚌 Live Buses (${patternBuses.length}):</strong>
                                 ${patternBuses.length === 0 ?
                                     '<div class="no-buses">No live buses</div>' :
-                                    patternBuses.map(bus => `
-                                        <div class="bus-item ${bus.status === 'heading_to_target' ? 'bus-heading' : 'bus-between'}">
+                                    patternBuses.map(bus => {
+                                        let statusClass = 'bus-heading';
+                                        let statusText = '→ ESCOLA';
+
+                                        if (bus.status === 'between_stops') {
+                                            statusClass = 'bus-between';
+                                            statusText = '↔ Between stops';
+                                        } else if (bus.status === 'passed_stops') {
+                                            statusClass = 'bus-passed';
+                                            statusText = '✓ Passed R Principal 146';
+                                        }
+
+                                        return `
+                                        <div class="bus-item ${statusClass}">
                                             <strong>Bus ${bus.vehicle_id} • Line ${bus.line_id}</strong>
                                             <div class="bus-info">
-                                                <span>Status: ${bus.status === 'heading_to_target' ? '→ ESCOLA' : '↔ Between stops'}</span>
+                                                <span>Status: ${statusText}</span>
                                                 <span>Speed: ${bus.speed || 0} km/h</span>
                                                 <span>Distance: ${bus.distance_to_target ? bus.distance_to_target + ' km' : 'N/A'}</span>
                                                 <span>${bus.eta_minutes ? 'ETA: ' + Math.round(bus.eta_minutes) + ' min' : 'No ETA'}</span>
                                             </div>
                                         </div>
-                                    `).join('')
+                                        `;
+                                    }).join('')
                                 }
                             </div>
                         </div>
@@ -423,7 +441,11 @@
                         <strong>Speed:</strong> ${bus.speed} km/h<br>
                         <strong>Distance:</strong> ${bus.distance_to_target} km<br>
                         ${bus.eta_minutes ? '<strong>ETA:</strong> ' + Math.round(bus.eta_minutes) + ' min<br>' : ''}
-                        <strong>Status:</strong> ${bus.status === 'heading_to_target' ? 'Heading to ESCOLA' : 'Between stops'}
+                        <strong>Status:</strong> ${
+                            bus.status === 'heading_to_target' ? 'Heading to ESCOLA' :
+                            bus.status === 'between_stops' ? 'Between stops' :
+                            'Passed R Principal 146'
+                        }
                     `);
 
                     busMarkers[bus.id] = marker;
