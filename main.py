@@ -1,5 +1,5 @@
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 import httpx
@@ -9,6 +9,8 @@ import logging
 import asyncio
 from html import escape
 from typing import List, Dict, Optional
+import time
+from collections import defaultdict
 
 app = FastAPI(title="Carris Bus Tracker", version="1.0.0")
 
@@ -19,14 +21,25 @@ logger = logging.getLogger(__name__)
 # Add security middleware
 import os
 allowed_hosts = ["localhost", "127.0.0.1"]
-# Add Render domain if deployed
+# Add specific production domains when deployed
 if os.getenv("RENDER"):
-    allowed_hosts.append("*")  # Allow all hosts on Render
+    render_service_name = os.getenv("RENDER_SERVICE_NAME", "carris-tracker")
+    allowed_hosts.extend([
+        f"{render_service_name}.onrender.com",
+        # Add any custom domains here
+        # "your-custom-domain.com"
+    ])
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=allowed_hosts)
 cors_origins = ["http://localhost:8000", "http://127.0.0.1:8000"]
-# Allow all origins on Render for simplicity
+# Add specific production domains when deployed
 if os.getenv("RENDER"):
-    cors_origins = ["*"]
+    # Replace with your actual Render domain
+    render_service_name = os.getenv("RENDER_SERVICE_NAME", "carris-tracker")
+    cors_origins.extend([
+        f"https://{render_service_name}.onrender.com",
+        # Add any custom domains here
+        # "https://your-custom-domain.com"
+    ])
 
 app.add_middleware(
     CORSMiddleware,
@@ -35,6 +48,46 @@ app.add_middleware(
     allow_methods=["GET"],
     allow_headers=["*"],
 )
+
+# Security headers middleware
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' https://unpkg.com; "
+        "style-src 'self' 'unsafe-inline' https://unpkg.com; "
+        "img-src 'self' data: https:; "
+        "connect-src 'self' https://api.carrismetropolitana.pt"
+    )
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    return response
+
+# Simple rate limiting
+rate_limit_store = defaultdict(list)
+RATE_LIMIT_REQUESTS = 30  # requests per minute
+RATE_LIMIT_WINDOW = 60    # seconds
+
+def check_rate_limit(client_ip: str) -> bool:
+    """Simple in-memory rate limiting"""
+    current_time = time.time()
+
+    # Clean old entries
+    rate_limit_store[client_ip] = [
+        req_time for req_time in rate_limit_store[client_ip]
+        if current_time - req_time < RATE_LIMIT_WINDOW
+    ]
+
+    # Check if limit exceeded
+    if len(rate_limit_store[client_ip]) >= RATE_LIMIT_REQUESTS:
+        return False
+
+    # Add current request
+    rate_limit_store[client_ip].append(current_time)
+    return True
 
 # Target stop coordinates
 TARGET_STOP = {
@@ -234,7 +287,7 @@ async def fetch_bus_data() -> List[Dict]:
                         elif (additional_sequence is not None and
                               target_sequence <= current_sequence < additional_sequence):
                             bus_status = "between_stops"
-                            color = "#B8860B"  # dark yellow
+                            color = "#FFD700"  # regular yellow
 
                             bus_lat = validate_coordinate(bus.get("lat"), "lat")
                             bus_lon = validate_coordinate(bus.get("lon"), "lon")
@@ -287,13 +340,27 @@ async def fetch_bus_data() -> List[Dict]:
             return []
 
 @app.get("/api/buses")
-async def get_buses():
-    """API endpoint to get filtered bus data with error handling"""
+async def get_buses(request: Request):
+    """API endpoint to get filtered bus data with error handling and rate limiting"""
+    # Get client IP
+    client_ip = request.client.host
+
+    # Check rate limit
+    if not check_rate_limit(client_ip):
+        logger.warning(f"Rate limit exceeded for IP: {client_ip}")
+        raise HTTPException(
+            status_code=429,
+            detail="Too many requests. Please try again later.",
+            headers={"Retry-After": "60"}
+        )
+
     try:
         return await fetch_bus_data()
+    except httpx.RequestError as e:
+        logger.error(f"External API error: {type(e).__name__}")
+        raise HTTPException(status_code=503, detail="External service unavailable")
     except Exception as e:
-        logger.error(f"Failed to fetch bus data: {type(e).__name__}")
-        logger.debug(f"Bus data fetch error: {e}")
+        logger.error(f"Internal error: {type(e).__name__}", exc_info=True)
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
