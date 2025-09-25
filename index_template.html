@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Carris Bus Tracker - ESCOLA Stop</title>
+    <title>Monitor de Autocarros Carris - Paragem ESCOLA</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet"
           href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -82,11 +82,54 @@
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
 
+        /* Tab styles */
+        .tabs-container {
+            display: flex;
+            background: #2c3e50;
+            border-radius: 8px 8px 0 0;
+        }
+
+        .tab-button {
+            flex: 1;
+            padding: 12px 10px;
+            background: #34495e;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 0.9em;
+            font-weight: 500;
+            transition: background-color 0.2s;
+        }
+
+        .tab-button:first-child {
+            border-radius: 8px 0 0 0;
+        }
+
+        .tab-button:last-child {
+            border-radius: 0 8px 0 0;
+        }
+
+        .tab-button.active {
+            background: #2c3e50;
+            color: #3498db;
+        }
+
+        .tab-button:hover:not(.active) {
+            background: #3f5a7a;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
         .legend {
             background: #34495e;
             color: white;
             padding: 10px;
-            border-radius: 8px 8px 0 0;
         }
 
         .legend-grid {
@@ -290,8 +333,8 @@
 </head>
 <body>
     <div class="header">
-        <h1>🚌 Carris Bus Tracker - ESCOLA Stop</h1>
-        <p>Real-time tracking for Lines 1603, 1636, 1637</p>
+        <h1>🚌 Monitor de Autocarros Carris - Paragem ESCOLA</h1>
+        <p>Rastreamento em tempo real das Linhas 1603, 1636, 1637</p>
         <div class="refresh-countdown" id="refresh-countdown">⟳ 30s</div>
     </div>
 
@@ -301,33 +344,77 @@
         </div>
 
         <div class="sidebar">
-            <div class="legend">
-                <div class="legend-grid">
-                    <div class="legend-item">
-                        <span class="legend-color" style="background-color: #ff4444;"></span>
-                        ESCOLA Stop (110004)
+            <div class="tabs-container">
+                <button class="tab-button active" data-tab="escola">ESCOLA</button>
+                <button class="tab-button" data-tab="dona_maria">DONA MARIA</button>
+            </div>
+
+            <!-- ESCOLA Tab Content -->
+            <div id="escola-content" class="tab-content active">
+                <div class="legend">
+                    <div class="legend-grid">
+                        <div class="legend-item">
+                            <span class="legend-color" style="background-color: #ff4444;"></span>
+                            ESCOLA
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-color" style="background-color: #4444ff;"></span>
+                            DONA MARIA
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-color" style="background-color: #ff8800;"></span>
+                            Autocarro a caminho de ESCOLA
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-color" style="background-color: #FFD700;"></span>
+                            Autocarro entre paragens
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-color" style="background-color: #000000;"></span>
+                            Autocarro passou DONA MARIA
+                        </div>
                     </div>
-                    <div class="legend-item">
-                        <span class="legend-color" style="background-color: #4444ff;"></span>
-                        R Principal 146 (171577)
-                    </div>
-                    <div class="legend-item">
-                        <span class="legend-color" style="background-color: #ff8800;"></span>
-                        Bus heading to ESCOLA
-                    </div>
-                    <div class="legend-item">
-                        <span class="legend-color" style="background-color: #FFD700;"></span>
-                        Bus between stops
-                    </div>
-                    <div class="legend-item">
-                        <span class="legend-color" style="background-color: #000000;"></span>
-                        Bus passed R Principal 146
+                </div>
+
+                <div id="bus-sections-escola">
+                    <div class="bus-section">
+                        <h4>Loading schedules...</h4>
                     </div>
                 </div>
             </div>
 
-            <div id="bus-sections">
-                <!-- Bus sections will be populated by JavaScript -->
+            <!-- DONA MARIA Tab Content -->
+            <div id="dona_maria-content" class="tab-content">
+                <div class="legend">
+                    <div class="legend-grid">
+                        <div class="legend-item">
+                            <span class="legend-color" style="background-color: #4444ff;"></span>
+                            DONA MARIA
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-color" style="background-color: #ff4444;"></span>
+                            ESCOLA
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-color" style="background-color: #ff8800;"></span>
+                            Autocarro a caminho de DONA MARIA
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-color" style="background-color: #FFD700;"></span>
+                            Autocarro entre paragens
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-color" style="background-color: #000000;"></span>
+                            Autocarro passou ESCOLA
+                        </div>
+                    </div>
+                </div>
+
+                <div id="bus-sections-dona-maria">
+                    <div class="bus-section">
+                        <h4>Loading schedules...</h4>
+                    </div>
+                </div>
             </div>
 
             <div id="last-update"></div>
@@ -340,9 +427,13 @@
         let targetMarker;
         let additionalMarker;
 
-        const SCHEDULES = {{SCHEDULES_JSON}};
+        const SCHEDULES_ESCOLA = {{SCHEDULES_ESCOLA_JSON}};
+        const SCHEDULES_DONA_MARIA = {{SCHEDULES_DONA_MARIA_JSON}};
         const TARGET_STOP = {{TARGET_STOP_JSON}};
         const ADDITIONAL_POINT = {{ADDITIONAL_POINT_JSON}};
+
+        let currentTab = 'escola';
+        let currentBusData = {};
 
         async function initMap() {
             // Create map without initial center/zoom
@@ -363,7 +454,7 @@
                 zIndexOffset: 1000
             }).addTo(map);
 
-            targetMarker.bindPopup(`<b>ESCOLA Stop</b><br>ID: ${TARGET_STOP.id}<br>Lat: ${TARGET_STOP.lat}<br>Lon: ${TARGET_STOP.lon}`);
+            targetMarker.bindPopup(`<b>ESCOLA</b><br>Lat: ${TARGET_STOP.lat}<br>Lon: ${TARGET_STOP.lon}`);
 
             // Add additional point marker
             additionalMarker = L.marker([ADDITIONAL_POINT.lat, ADDITIONAL_POINT.lon], {
@@ -376,7 +467,7 @@
                 zIndexOffset: 1000
             }).addTo(map);
 
-            additionalMarker.bindPopup(`<b>${ADDITIONAL_POINT.name}</b><br>ID: ${ADDITIONAL_POINT.id}<br>Lat: ${ADDITIONAL_POINT.lat}<br>Lon: ${ADDITIONAL_POINT.lon}`);
+            additionalMarker.bindPopup(`<b>DONA MARIA</b><br>Lat: ${ADDITIONAL_POINT.lat}<br>Lon: ${ADDITIONAL_POINT.lon}`);
 
             // Center map on both markers
             const bounds = L.latLngBounds([
@@ -386,8 +477,9 @@
             map.fitBounds(bounds, {padding: [20, 20]});
         }
 
-        function createScheduleTable(patternId) {
-            const schedule = SCHEDULES[patternId];
+        function createScheduleTable(patternId, direction = currentTab) {
+            const schedules = direction === 'dona_maria' ? SCHEDULES_DONA_MARIA : SCHEDULES_ESCOLA;
+            const schedule = schedules[patternId];
             if (!schedule) return '';
 
             const now = new Date();
@@ -417,18 +509,38 @@
             `;
         }
 
-        async function loadBusData() {
+        async function loadBusData(direction = currentTab) {
             try {
-                const response = await fetch('/api/buses');
+                const response = await fetch(`/api/buses?direction=${direction}`);
                 const buses = await response.json();
 
-                // Clear existing bus markers
+                // Store bus data for current direction
+                currentBusData[direction] = buses;
+
+                // Only update display if this is the current tab
+                if (direction === currentTab) {
+                    updateBusDisplay(buses, direction);
+                }
+            } catch (error) {
+                console.error('Error loading bus data:', error);
+                const busContainer = document.getElementById(`bus-sections-${direction === 'dona_maria' ? 'dona-maria' : 'escola'}`);
+                if (busContainer && direction === currentTab) {
+                    busContainer.innerHTML = '<div class="no-buses">Error loading bus data. Please refresh.</div>';
+                }
+            }
+        }
+
+        function updateBusDisplay(buses, direction) {
+            // Clear existing bus markers only for current tab
+            if (direction === currentTab) {
                 Object.values(busMarkers).forEach(marker => map.removeLayer(marker));
                 busMarkers = {};
+            }
 
-                const busContainer = document.getElementById('bus-sections');
+            const containerSuffix = direction === 'dona_maria' ? 'dona-maria' : 'escola';
+            const busContainer = document.getElementById(`bus-sections-${containerSuffix}`);
 
-                // Group buses by pattern
+            // Group buses by pattern
                 const busesByPattern = {};
                 buses.forEach(bus => {
                     if (!busesByPattern[bus.pattern_id]) {
@@ -437,50 +549,87 @@
                     busesByPattern[bus.pattern_id].push(bus);
                 });
 
-                // Create sections for each pattern
-                const patterns = ['1603_0_2', '1636_0_1', '1636_1_1', '1637_0_1'];
-                let sectionsHTML = '';
+            // Create sections for each pattern
+            const allPatterns = direction === 'dona_maria'
+                ? ['1603_0_1', '1636_0_2', '1636_1_2', '1637_0_2']
+                : ['1603_0_2', '1636_0_1', '1636_1_1', '1637_0_1'];
 
-                patterns.forEach(patternId => {
-                    const patternBuses = busesByPattern[patternId] || [];
-                    const schedule = SCHEDULES[patternId];
+            const schedules = direction === 'dona_maria' ? SCHEDULES_DONA_MARIA : SCHEDULES_ESCOLA;
+            const targetName = direction === 'dona_maria' ? 'DONA MARIA' : 'ESCOLA';
+            const secondStopName = direction === 'dona_maria' ? 'ESCOLA' : 'R Principal 146';
 
-                    sectionsHTML += `
-                        <div class="bus-section">
-                            <h4>
-                                Line ${schedule ? schedule.line : patternId.split('_')[0]}
-                                <span class="pattern-badge">${patternId}</span>
-                            </h4>
+            // Get current time for sorting
+            const now = new Date();
+            const currentTimeMinutes = now.getHours() * 60 + now.getMinutes();
 
-                            <div class="schedule-table">
-                                <strong style="font-size: 0.8em; color: #666; margin-bottom: 4px; display: block;">📅 Scheduled Times to ESCOLA:</strong>
-                                ${createScheduleTable(patternId)}
-                            </div>
+            // Sort patterns by next bus time
+            const patterns = allPatterns.sort((a, b) => {
+                const scheduleA = schedules[a];
+                const scheduleB = schedules[b];
 
-                            <div style="margin-top: 8px;">
-                                <strong style="font-size: 0.8em; color: #666; margin-bottom: 4px; display: block;">🚌 Live Buses (${patternBuses.length}):</strong>
-                                ${patternBuses.length === 0 ?
-                                    '<div class="no-buses">No live buses</div>' :
-                                    patternBuses.map(bus => {
-                                        let statusClass = 'bus-heading';
-                                        let statusText = '→ ESCOLA';
+                if (!scheduleA || !scheduleB) return 0;
 
-                                        if (bus.status === 'between_stops') {
-                                            statusClass = 'bus-between';
-                                            statusText = '↔ Between stops';
-                                        } else if (bus.status === 'passed_stops') {
-                                            statusClass = 'bus-passed';
-                                            statusText = '✓ Passed R Principal 146';
-                                        }
+                // Find next bus time for pattern A
+                const timesA = scheduleA.times.map(time => {
+                    const [hours, minutes] = time.split(':').map(Number);
+                    return hours * 60 + minutes;
+                });
+                let nextA = timesA.find(t => t > currentTimeMinutes);
+                if (!nextA) nextA = timesA[0] + 24 * 60; // Next day
+
+                // Find next bus time for pattern B
+                const timesB = scheduleB.times.map(time => {
+                    const [hours, minutes] = time.split(':').map(Number);
+                    return hours * 60 + minutes;
+                });
+                let nextB = timesB.find(t => t > currentTimeMinutes);
+                if (!nextB) nextB = timesB[0] + 24 * 60; // Next day
+
+                return nextA - nextB;
+            });
+
+            let sectionsHTML = '';
+
+            patterns.forEach(patternId => {
+                const patternBuses = busesByPattern[patternId] || [];
+                const schedule = schedules[patternId];
+
+                sectionsHTML += `
+                    <div class="bus-section">
+                        <h4>
+                            Line ${schedule ? schedule.line : patternId.split('_')[0]}
+                            <span class="pattern-badge">${patternId}</span>
+                        </h4>
+
+                        <div class="schedule-table">
+                            <strong style="font-size: 0.8em; color: #666; margin-bottom: 4px; display: block;">📅 Horários para ${targetName}:</strong>
+                            ${createScheduleTable(patternId, direction)}
+                        </div>
+
+                        <div style="margin-top: 8px;">
+                            <strong style="font-size: 0.8em; color: #666; margin-bottom: 4px; display: block;">🚌 Autocarros ao Vivo (${patternBuses.length}):</strong>
+                            ${patternBuses.length === 0 ?
+                                '<div class="no-buses">Nenhum autocarro ativo</div>' :
+                                patternBuses.map(bus => {
+                                    let statusClass = 'bus-heading';
+                                    let statusText = `→ ${targetName}`;
+
+                                    if (bus.status === 'between_stops') {
+                                        statusClass = 'bus-between';
+                                        statusText = '↔ Entre paragens';
+                                    } else if (bus.status === 'passed_stops') {
+                                        statusClass = 'bus-passed';
+                                        statusText = `✓ Passou ${secondStopName}`;
+                                    }
 
                                         return `
                                         <div class="bus-item ${statusClass}">
-                                            <strong>Bus ${bus.vehicle_id} • Line ${bus.line_id}</strong>
+                                            <strong>Autocarro ${bus.id ? bus.id.split('|')[0] : 'N/A'} • Linha ${bus.line_id}</strong>
                                             <div class="bus-info">
-                                                <span>Status: ${statusText}</span>
-                                                <span>Speed: ${bus.speed || 0} km/h</span>
-                                                <span>Distance: ${bus.distance_to_target ? bus.distance_to_target + ' km' : 'N/A'}</span>
-                                                <span>${bus.eta_minutes ? 'ETA: ' + Math.round(bus.eta_minutes) + ' min' : 'No ETA'}</span>
+                                                <span>Estado: ${statusText}</span>
+                                                <span>Velocidade: ${(bus.speed || 0).toFixed(2)} km/h</span>
+                                                <span>Distância: ${bus.distance_to_target ? bus.distance_to_target + ' km' : 'N/A'}</span>
+                                                <span>${bus.eta_minutes ? 'Chegada: ' + Math.round(bus.eta_minutes) + ' min' : 'Sem previsão'}</span>
                                             </div>
                                         </div>
                                         `;
@@ -522,16 +671,16 @@
                     }).addTo(map);
 
                     marker.bindPopup(`
-                        <b>🚌 Bus ${bus.vehicle_id}</b><br>
-                        <strong>Line:</strong> ${bus.line_id}<br>
-                        <strong>Pattern:</strong> ${bus.pattern_id}<br>
-                        <strong>Speed:</strong> ${bus.speed} km/h<br>
-                        <strong>Distance:</strong> ${bus.distance_to_target} km<br>
-                        ${bus.eta_minutes ? '<strong>ETA:</strong> ' + Math.round(bus.eta_minutes) + ' min<br>' : ''}
-                        <strong>Status:</strong> ${
-                            bus.status === 'heading_to_target' ? 'Heading to ESCOLA' :
-                            bus.status === 'between_stops' ? 'Between stops' :
-                            'Passed R Principal 146'
+                        <b>🚌 Autocarro ${bus.id ? bus.id.split('|')[0] : 'N/A'}</b><br>
+                        <strong>Linha:</strong> ${bus.line_id}<br>
+                        <strong>Padrão:</strong> ${bus.pattern_id}<br>
+                        <strong>Velocidade:</strong> ${bus.speed.toFixed(2)} km/h<br>
+                        <strong>Distância:</strong> ${bus.distance_to_target} km<br>
+                        ${bus.eta_minutes ? '<strong>Chegada:</strong> ' + Math.round(bus.eta_minutes) + ' min<br>' : ''}
+                        <strong>Estado:</strong> ${
+                            bus.status === 'heading_to_target' ? (direction === 'dona_maria' ? 'A caminho de DONA MARIA' : 'A caminho de ESCOLA') :
+                            bus.status === 'between_stops' ? 'Entre paragens' :
+                            (direction === 'dona_maria' ? 'Passou ESCOLA' : 'Passou DONA MARIA')
                         }
                     `);
 
@@ -546,11 +695,7 @@
                     map.fitBounds(bounds, {padding: [20, 20]});
                 }
 
-                document.getElementById('last-update').textContent = `🕐 Last updated: ${new Date().toLocaleTimeString()}`;
-            } catch (error) {
-                console.error('Error loading bus data:', error);
-                document.getElementById('bus-sections').innerHTML = '<div class="no-buses">Error loading bus data. Please refresh.</div>';
-            }
+                document.getElementById('last-update').textContent = `🕐 Última atualização: ${new Date().toLocaleTimeString()}`;
         }
 
         // Countdown timer
@@ -578,13 +723,126 @@
         }
 
         async function loadBusDataWithCountdown() {
-            await loadBusData();
+            // Load data for both directions
+            await Promise.all([
+                loadBusData('escola'),
+                loadBusData('dona_maria')
+            ]);
             resetCountdown();
+        }
+
+        // Tab switching functionality
+        function switchTab(targetTab) {
+            console.log('Switching to tab:', targetTab);
+
+            // Update current tab
+            currentTab = targetTab;
+
+            // Update tab buttons
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.dataset.tab === targetTab) {
+                    btn.classList.add('active');
+                }
+            });
+
+            // Update tab content
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            const contentId = targetTab === 'dona_maria' ? 'dona_maria-content' : 'escola-content';
+            console.log('Activating content:', contentId);
+            const targetContent = document.getElementById(contentId);
+            if (targetContent) {
+                targetContent.classList.add('active');
+            } else {
+                console.error('Content element not found:', contentId);
+            }
+
+            // Update bus display for current tab
+            if (currentBusData[targetTab]) {
+                console.log('Updating bus display for:', targetTab);
+                updateBusDisplay(currentBusData[targetTab], targetTab);
+            } else {
+                console.log('No bus data yet for:', targetTab);
+            }
+        }
+
+        // Test function to verify basic functionality
+        function testScheduleDisplay() {
+            console.log('Testing schedule display...');
+
+            // Test ESCOLA tab
+            const escolaContainer = document.getElementById('bus-sections-escola');
+            if (escolaContainer) {
+                const patternId = '1603_0_2';
+                const schedule = SCHEDULES_ESCOLA[patternId];
+                if (schedule) {
+                    escolaContainer.innerHTML = `
+                        <div class="bus-section">
+                            <h4>Line ${schedule.line} - ${patternId}</h4>
+                            <div class="schedule-table">
+                                <strong>📅 Horários para ESCOLA:</strong>
+                                ${createScheduleTable(patternId, 'escola')}
+                            </div>
+                        </div>
+                    `;
+                    console.log('ESCOLA schedule displayed');
+                } else {
+                    console.error('No schedule found for:', patternId);
+                }
+            } else {
+                console.error('ESCOLA container not found');
+            }
+
+            // Test DONA MARIA tab
+            const donaMariaContainer = document.getElementById('bus-sections-dona-maria');
+            if (donaMariaContainer) {
+                const patternId = '1603_0_1';
+                const schedule = SCHEDULES_DONA_MARIA[patternId];
+                if (schedule) {
+                    donaMariaContainer.innerHTML = `
+                        <div class="bus-section">
+                            <h4>Line ${schedule.line} - ${patternId}</h4>
+                            <div class="schedule-table">
+                                <strong>📅 Horários para DONA MARIA:</strong>
+                                ${createScheduleTable(patternId, 'dona_maria')}
+                            </div>
+                        </div>
+                    `;
+                    console.log('DONA MARIA schedule displayed');
+                } else {
+                    console.error('No schedule found for:', patternId);
+                }
+            } else {
+                console.error('DONA MARIA container not found');
+            }
         }
 
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
-            initMap();
+            console.log('DOM loaded, initializing...');
+            console.log('SCHEDULES_ESCOLA:', SCHEDULES_ESCOLA);
+            console.log('SCHEDULES_DONA_MARIA:', SCHEDULES_DONA_MARIA);
+
+            // Test basic schedule display immediately
+            testScheduleDisplay();
+
+            try {
+                initMap();
+                console.log('Map initialized');
+            } catch (e) {
+                console.error('Map initialization failed:', e);
+            }
+
+            // Add tab click listeners
+            document.querySelectorAll('.tab-button').forEach(button => {
+                button.addEventListener('click', () => {
+                    console.log('Tab clicked:', button.dataset.tab);
+                    switchTab(button.dataset.tab);
+                });
+            });
+
             loadBusDataWithCountdown();
             setInterval(loadBusDataWithCountdown, 30000); // Refresh every 30 seconds
         });

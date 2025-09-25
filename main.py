@@ -58,7 +58,7 @@ async def add_security_headers(request: Request, call_next):
         "script-src 'self' 'unsafe-inline' https://unpkg.com; "
         "style-src 'self' 'unsafe-inline' https://unpkg.com; "
         "img-src 'self' data: https:; "
-        "connect-src 'self' https://api.carrismetropolitana.pt"
+        "connect-src 'self' https://api.carrismetropolitana.pt https://unpkg.com"
     )
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
@@ -105,15 +105,21 @@ ADDITIONAL_POINT = {
     "name": "R Principal 146"
 }
 
-# Filter criteria
-FILTER_CRITERIA = {
+# Filter criteria for both directions
+FILTER_CRITERIA_ESCOLA = {
     "pattern_ids": ["1637_0_1", "1636_0_1", "1636_1_1", "1603_0_2"],
     "route_ids": ["1603_0", "1636_0", "1636_1", "1637_0"],
     "line_ids": ["1603", "1636", "1637"]
 }
 
-# Schedule data for ESCOLA stop
-SCHEDULES = {
+FILTER_CRITERIA_DONA_MARIA = {
+    "pattern_ids": ["1603_0_1", "1636_0_2", "1636_1_2", "1637_0_2"],
+    "route_ids": ["1603_0", "1636_0", "1636_1", "1637_0"],
+    "line_ids": ["1603", "1636", "1637"]
+}
+
+# Schedule data for ESCOLA stop (buses going to ESCOLA first, then to DONA MARIA)
+SCHEDULES_ESCOLA = {
     "1603_0_2": {
         "line": "1603",
         "times": ["6:12", "6:52", "7:32", "8:22", "9:07", "9:52", "11:12", "12:37", "14:02", "15:22", "16:47", "17:37", "18:22", "19:12", "19:52"]
@@ -129,6 +135,26 @@ SCHEDULES = {
     "1637_0_1": {
         "line": "1637",
         "times": ["7:13", "8:04", "9:14", "12:04", "13:21", "15:21", "17:04", "18:04", "19:14"]
+    }
+}
+
+# Schedule data for DONA MARIA stop (buses going to DONA MARIA first, then to ESCOLA)
+SCHEDULES_DONA_MARIA = {
+    "1603_0_1": {
+        "line": "1603",
+        "times": ["7:19", "8:06", "8:52", "9:37", "10:59", "12:24", "13:49", "15:09", "16:32", "17:21", "18:06", "18:56", "19:37", "20:19", "20:54"]
+    },
+    "1636_0_2": {
+        "line": "1636",
+        "times": ["7:21", "8:21", "10:26", "12:32", "14:26", "16:26", "18:36", "19:56"]
+    },
+    "1636_1_2": {
+        "line": "1636",
+        "times": ["6:31", "6:51", "7:51", "8:53", "11:01", "13:01", "15:01", "17:01", "17:31", "18:06", "19:11", "20:26"]
+    },
+    "1637_0_2": {
+        "line": "1637",
+        "times": ["6:56", "7:43", "8:38", "9:48", "12:43", "13:56", "15:55", "17:45", "18:46"]
     }
 }
 
@@ -221,12 +247,22 @@ async def fetch_pattern_stops(pattern_id: str) -> Dict:
             logger.debug(f"Pattern fetch error details: {e}")
             return {}
 
-async def fetch_bus_data() -> List[Dict]:
+async def fetch_bus_data(direction: str = "escola") -> List[Dict]:
     """Fetch bus data from Carris API and filter based on stop sequence logic"""
+
+    # Select filter criteria based on direction
+    if direction == "dona_maria":
+        filter_criteria = FILTER_CRITERIA_DONA_MARIA
+        target_stop_id = "171577"  # DONA MARIA is first stop
+        additional_stop_id = "110004"  # ESCOLA is second stop
+    else:  # escola
+        filter_criteria = FILTER_CRITERIA_ESCOLA
+        target_stop_id = "110004"  # ESCOLA is first stop
+        additional_stop_id = "171577"  # DONA MARIA is second stop
 
     # First fetch all pattern stop sequences
     pattern_data = {}
-    for pattern_id in FILTER_CRITERIA["pattern_ids"]:
+    for pattern_id in filter_criteria["pattern_ids"]:
         pattern_data[pattern_id] = await fetch_pattern_stops(pattern_id)
 
     async with httpx.AsyncClient() as client:
@@ -242,17 +278,17 @@ async def fetch_bus_data() -> List[Dict]:
                 stop_id = bus.get("stop_id")
 
                 # Check if bus matches our pattern criteria
-                if (pattern_id in FILTER_CRITERIA["pattern_ids"] and
-                    bus.get("route_id") in FILTER_CRITERIA["route_ids"] and
-                    bus.get("line_id") in FILTER_CRITERIA["line_ids"] and
+                if (pattern_id in filter_criteria["pattern_ids"] and
+                    bus.get("route_id") in filter_criteria["route_ids"] and
+                    bus.get("line_id") in filter_criteria["line_ids"] and
                     pattern_id in pattern_data and
                     stop_id):
 
                     stop_sequences = pattern_data[pattern_id]
 
-                    # Get stop sequences for target stops
-                    target_sequence = stop_sequences.get("110004")  # TARGET_STOP
-                    additional_sequence = stop_sequences.get("171577")  # ADDITIONAL_POINT
+                    # Get stop sequences for target stops (dynamic based on direction)
+                    target_sequence = stop_sequences.get(target_stop_id)  # First stop
+                    additional_sequence = stop_sequences.get(additional_stop_id)  # Second stop
                     current_sequence = stop_sequences.get(stop_id)
 
                     if target_sequence is not None and current_sequence is not None:
@@ -271,9 +307,15 @@ async def fetch_bus_data() -> List[Dict]:
                             if bus_lat is None or bus_lon is None:
                                 continue  # Skip buses with invalid coordinates
 
+                            # Calculate distance to the target stop based on direction
+                            if direction == "dona_maria":
+                                target_coords = ADDITIONAL_POINT  # DONA MARIA coordinates
+                            else:
+                                target_coords = TARGET_STOP  # ESCOLA coordinates
+
                             distance = calculate_distance(
                                 bus_lat, bus_lon,
-                                TARGET_STOP["lat"], TARGET_STOP["lon"]
+                                target_coords["lat"], target_coords["lon"]
                             )
 
                             # Calculate ETA if bus has valid speed
@@ -295,9 +337,15 @@ async def fetch_bus_data() -> List[Dict]:
                             if bus_lat is None or bus_lon is None:
                                 continue  # Skip buses with invalid coordinates
 
+                            # Calculate distance to the target stop based on direction
+                            if direction == "dona_maria":
+                                target_coords = ADDITIONAL_POINT  # DONA MARIA coordinates
+                            else:
+                                target_coords = TARGET_STOP  # ESCOLA coordinates
+
                             distance = calculate_distance(
                                 bus_lat, bus_lon,
-                                TARGET_STOP["lat"], TARGET_STOP["lon"]
+                                target_coords["lat"], target_coords["lon"]
                             )
                             eta_minutes = None
 
@@ -313,9 +361,15 @@ async def fetch_bus_data() -> List[Dict]:
                             if bus_lat is None or bus_lon is None:
                                 continue  # Skip buses with invalid coordinates
 
+                            # Calculate distance to the target stop based on direction
+                            if direction == "dona_maria":
+                                target_coords = ADDITIONAL_POINT  # DONA MARIA coordinates
+                            else:
+                                target_coords = TARGET_STOP  # ESCOLA coordinates
+
                             distance = calculate_distance(
                                 bus_lat, bus_lon,
-                                TARGET_STOP["lat"], TARGET_STOP["lon"]
+                                target_coords["lat"], target_coords["lon"]
                             )
                             eta_minutes = None
 
@@ -340,7 +394,7 @@ async def fetch_bus_data() -> List[Dict]:
             return []
 
 @app.get("/api/buses")
-async def get_buses(request: Request):
+async def get_buses(request: Request, direction: str = "escola"):
     """API endpoint to get filtered bus data with error handling and rate limiting"""
     # Get client IP
     client_ip = request.client.host
@@ -354,8 +408,12 @@ async def get_buses(request: Request):
             headers={"Retry-After": "60"}
         )
 
+    # Validate direction parameter
+    if direction not in ["escola", "dona_maria"]:
+        raise HTTPException(status_code=400, detail="Invalid direction. Must be 'escola' or 'dona_maria'")
+
     try:
-        return await fetch_bus_data()
+        return await fetch_bus_data(direction)
     except httpx.RequestError as e:
         logger.error(f"External API error: {type(e).__name__}")
         raise HTTPException(status_code=503, detail="External service unavailable")
@@ -379,7 +437,9 @@ async def index():
     ).replace(
         '{{TARGET_STOP_ID}}', sanitize_string(str(TARGET_STOP['id']))
     ).replace(
-        '{{SCHEDULES_JSON}}', json.dumps(SCHEDULES)
+        '{{SCHEDULES_ESCOLA_JSON}}', json.dumps(SCHEDULES_ESCOLA)
+    ).replace(
+        '{{SCHEDULES_DONA_MARIA_JSON}}', json.dumps(SCHEDULES_DONA_MARIA)
     ).replace(
         '{{TARGET_STOP_JSON}}', json.dumps(TARGET_STOP)
     ).replace(
