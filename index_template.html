@@ -695,7 +695,7 @@
                             icon: L.divIcon({
                                 className: 'stop-marker',
                                 html: `<div style="
-                                    background-color: #ff0000;
+                                    background-color: #ff69b4;
                                     width: 24px;
                                     height: 24px;
                                     border-radius: 50%;
@@ -710,7 +710,7 @@
                         }).addTo(map);
 
                         prevMarker.bindPopup(`
-                            <b>🔴 Paragem Anterior</b><br>
+                            <b>🩷 Paragem Anterior</b><br>
                             <strong>Nome:</strong> ${STOP_NAMES[bus.previous_stop.id] || bus.previous_stop.name}<br>
                             <strong>ID:</strong> ${bus.previous_stop.id}
                         `);
