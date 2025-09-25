@@ -431,6 +431,7 @@
         const SCHEDULES_DONA_MARIA = {{SCHEDULES_DONA_MARIA_JSON}};
         const TARGET_STOP = {{TARGET_STOP_JSON}};
         const ADDITIONAL_POINT = {{ADDITIONAL_POINT_JSON}};
+        const STOP_NAMES = {{STOP_NAMES_JSON}};
 
         let currentTab = 'escola';
         let currentBusData = {};
@@ -629,6 +630,7 @@
                                                 <span>Estado: ${statusText}</span>
                                                 <span>Velocidade: ${(bus.speed || 0).toFixed(2)} km/h</span>
                                                 <span>Distância: ${bus.distance_to_target ? bus.distance_to_target + ' km' : 'N/A'}</span>
+                                                <span>Status: ${bus.current_status} ${STOP_NAMES[bus.stop_id] || bus.stop_id}</span>
                                                 <span>${bus.eta_minutes ? 'Chegada: ' + Math.round(bus.eta_minutes) + ' min' : 'Sem previsão'}</span>
                                             </div>
                                         </div>
@@ -676,6 +678,7 @@
                         <strong>Padrão:</strong> ${bus.pattern_id}<br>
                         <strong>Velocidade:</strong> ${bus.speed.toFixed(2)} km/h<br>
                         <strong>Distância:</strong> ${bus.distance_to_target} km<br>
+                        <strong>Status:</strong> ${bus.current_status} ${STOP_NAMES[bus.stop_id] || bus.stop_id}<br>
                         ${bus.eta_minutes ? '<strong>Chegada:</strong> ' + Math.round(bus.eta_minutes) + ' min<br>' : ''}
                         <strong>Estado:</strong> ${
                             bus.status === 'heading_to_target' ? (direction === 'dona_maria' ? 'A caminho de DONA MARIA' : 'A caminho de ESCOLA') :

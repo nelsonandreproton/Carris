@@ -105,6 +105,46 @@ ADDITIONAL_POINT = {
     "name": "R Principal 146"
 }
 
+async def fetch_stop_names_from_patterns():
+    """Fetch stop names from all monitored patterns"""
+    stop_names = {
+        "110004": "ESCOLA",  # Keep our custom names
+        "171577": "DONA MARIA",
+    }
+
+    # Get all unique pattern IDs from both directions
+    all_patterns = set(FILTER_CRITERIA_ESCOLA["pattern_ids"] + FILTER_CRITERIA_DONA_MARIA["pattern_ids"])
+
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        for pattern_id in all_patterns:
+            try:
+                response = await client.get(f"https://api.carrismetropolitana.pt/patterns/{pattern_id}")
+                if response.status_code == 200:
+                    pattern_data = response.json()
+                    stops = pattern_data.get("path", [])
+                    for stop_info in stops:
+                        stop = stop_info.get("stop", {})
+                        stop_id = stop.get("id")
+                        stop_name = stop.get("name")
+                        if stop_id and stop_name:
+                            # Don't overwrite our custom names
+                            if stop_id not in stop_names:
+                                stop_names[stop_id] = stop_name
+                else:
+                    logger.warning(f"Failed to fetch pattern {pattern_id}: {response.status_code}")
+            except Exception as e:
+                logger.error(f"Error fetching pattern {pattern_id}: {e}")
+                continue
+
+    logger.info(f"Loaded {len(stop_names)} stop names from patterns")
+    return stop_names
+
+# Initialize with basic mapping - will be updated dynamically
+STOP_NAMES = {
+    "110004": "ESCOLA",
+    "171577": "DONA MARIA",
+}
+
 # Filter criteria for both directions
 FILTER_CRITERIA_ESCOLA = {
     "pattern_ids": ["1637_0_1", "1636_0_1", "1636_1_1", "1603_0_2"],
@@ -426,6 +466,15 @@ async def get_buses(request: Request, direction: str = "escola"):
 @app.get("/", response_class=HTMLResponse)
 async def index():
     """Main page with bus tracking interface"""
+    global STOP_NAMES
+
+    # Fetch updated stop names from patterns
+    try:
+        STOP_NAMES = await fetch_stop_names_from_patterns()
+    except Exception as e:
+        logger.error(f"Failed to fetch stop names: {e}")
+        # Continue with basic mapping if fetch fails
+
     # Read HTML template
     with open('index_template.html', 'r', encoding='utf-8') as f:
         template = f.read()
@@ -444,6 +493,8 @@ async def index():
         '{{TARGET_STOP_JSON}}', json.dumps(TARGET_STOP)
     ).replace(
         '{{ADDITIONAL_POINT_JSON}}', json.dumps(ADDITIONAL_POINT)
+    ).replace(
+        '{{STOP_NAMES_JSON}}', json.dumps(STOP_NAMES)
     )
 
     return html_content
