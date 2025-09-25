@@ -266,22 +266,32 @@ def is_heading_towards_target(bus_bearing: float, target_bearing: float, toleran
 
 
 async def fetch_pattern_stops(pattern_id: str) -> Dict:
-    """Fetch pattern stop sequence from Carris API"""
+    """Fetch pattern stop sequence and details from Carris API"""
     async with httpx.AsyncClient() as client:
         try:
             response = await client.get(f"https://api.carrismetropolitana.pt/patterns/{pattern_id}", timeout=10)
             response.raise_for_status()
             data = response.json()
 
-            # Build stop sequence mapping
+            # Build stop sequence mapping and detailed stop info
             stop_sequence = {}
+            stop_details = {}  # stop_id -> {lat, lon, name, sequence}
             path = data.get("path", [])
+
             for item in path:
                 stop_data = item.get("stop", {})
                 if stop_data and "id" in stop_data:
-                    stop_sequence[stop_data["id"]] = item.get("stop_sequence", 0)
+                    stop_id = stop_data["id"]
+                    sequence = item.get("stop_sequence", 0)
+                    stop_sequence[stop_id] = sequence
+                    stop_details[stop_id] = {
+                        "lat": stop_data.get("lat"),
+                        "lon": stop_data.get("lon"),
+                        "name": stop_data.get("name"),
+                        "sequence": sequence
+                    }
 
-            return stop_sequence
+            return {"sequences": stop_sequence, "details": stop_details}
         except httpx.RequestError as e:
             logger.error(f"Failed to fetch pattern stops for {pattern_id}: {type(e).__name__}")
             logger.debug(f"Pattern fetch error details: {e}")
@@ -324,12 +334,39 @@ async def fetch_bus_data(direction: str = "escola") -> List[Dict]:
                     pattern_id in pattern_data and
                     stop_id):
 
-                    stop_sequences = pattern_data[pattern_id]
+                    pattern_info = pattern_data[pattern_id]
+                    stop_sequences = pattern_info.get("sequences", {})
+                    stop_details = pattern_info.get("details", {})
 
                     # Get stop sequences for target stops (dynamic based on direction)
                     target_sequence = stop_sequences.get(target_stop_id)  # First stop
                     additional_sequence = stop_sequences.get(additional_stop_id)  # Second stop
                     current_sequence = stop_sequences.get(stop_id)
+
+                    # Calculate previous and next stops
+                    previous_stop = None
+                    next_stop = None
+
+                    # Find stops with sequence numbers adjacent to current stop
+                    for stop_id_check, details in stop_details.items():
+                        if details["sequence"] == current_sequence - 1:
+                            # Don't show marker if it's ESCOLA or DONA MARIA
+                            if stop_id_check not in ["110004", "171577"]:
+                                previous_stop = {
+                                    "id": stop_id_check,
+                                    "lat": details["lat"],
+                                    "lon": details["lon"],
+                                    "name": details["name"]
+                                }
+                        elif details["sequence"] == current_sequence + 1:
+                            # Don't show marker if it's ESCOLA or DONA MARIA
+                            if stop_id_check not in ["110004", "171577"]:
+                                next_stop = {
+                                    "id": stop_id_check,
+                                    "lat": details["lat"],
+                                    "lon": details["lon"],
+                                    "name": details["name"]
+                                }
 
                     if target_sequence is not None and current_sequence is not None:
                         bus_status = None
@@ -445,7 +482,9 @@ async def fetch_bus_data(direction: str = "escola") -> List[Dict]:
                                 "distance_to_target": round(distance, 2) if 'distance' in locals() else None,
                                 "eta_minutes": round(eta_minutes, 1) if eta_minutes else None,
                                 "current_stop_sequence": current_sequence,
-                                "target_stop_sequence": target_sequence
+                                "target_stop_sequence": target_sequence,
+                                "previous_stop": previous_stop,
+                                "next_stop": next_stop
                             }
                             filtered_buses.append(bus_data)
 

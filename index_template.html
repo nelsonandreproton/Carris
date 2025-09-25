@@ -688,6 +688,64 @@
                     `);
 
                     busMarkers[bus.id] = marker;
+
+                    // Add previous stop marker (red) if available
+                    if (bus.previous_stop) {
+                        const prevMarker = L.marker([parseFloat(bus.previous_stop.lat), parseFloat(bus.previous_stop.lon)], {
+                            icon: L.divIcon({
+                                className: 'stop-marker',
+                                html: `<div style="
+                                    background-color: #ff0000;
+                                    width: 16px;
+                                    height: 16px;
+                                    border-radius: 50%;
+                                    border: 2px solid white;
+                                    box-shadow: 0 1px 5px rgba(0,0,0,0.3);
+                                    z-index: 400;
+                                "></div>`,
+                                iconSize: [20, 20],
+                                iconAnchor: [10, 10]
+                            }),
+                            zIndexOffset: 400
+                        }).addTo(map);
+
+                        prevMarker.bindPopup(`
+                            <b>🔴 Paragem Anterior</b><br>
+                            <strong>Nome:</strong> ${STOP_NAMES[bus.previous_stop.id] || bus.previous_stop.name}<br>
+                            <strong>ID:</strong> ${bus.previous_stop.id}
+                        `);
+
+                        busMarkers[bus.id + '_prev'] = prevMarker;
+                    }
+
+                    // Add next stop marker (green) if available
+                    if (bus.next_stop) {
+                        const nextMarker = L.marker([parseFloat(bus.next_stop.lat), parseFloat(bus.next_stop.lon)], {
+                            icon: L.divIcon({
+                                className: 'stop-marker',
+                                html: `<div style="
+                                    background-color: #00ff00;
+                                    width: 16px;
+                                    height: 16px;
+                                    border-radius: 50%;
+                                    border: 2px solid white;
+                                    box-shadow: 0 1px 5px rgba(0,0,0,0.3);
+                                    z-index: 400;
+                                "></div>`,
+                                iconSize: [20, 20],
+                                iconAnchor: [10, 10]
+                            }),
+                            zIndexOffset: 400
+                        }).addTo(map);
+
+                        nextMarker.bindPopup(`
+                            <b>🟢 Próxima Paragem</b><br>
+                            <strong>Nome:</strong> ${STOP_NAMES[bus.next_stop.id] || bus.next_stop.name}<br>
+                            <strong>ID:</strong> ${bus.next_stop.id}
+                        `);
+
+                        busMarkers[bus.id + '_next'] = nextMarker;
+                    }
                 });
 
                 // Center map on buses if any exist
