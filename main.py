@@ -20,14 +20,14 @@ logger = logging.getLogger(__name__)
 
 # Add security middleware
 import os
-allowed_hosts = ["localhost", "127.0.0.1"]
+allowed_hosts = ["localhost", "127.0.0.1", "testserver"]
 # Add specific production domains when deployed
 if os.getenv("RENDER"):
     render_service_name = os.getenv("RENDER_SERVICE_NAME", "carris-tracker")
     allowed_hosts.extend([
         f"{render_service_name}.onrender.com",
-        # Add any custom domains here
-        # "your-custom-domain.com"
+        # Add custom domains here
+        "carris.nelsonandre.pt"
     ])
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=allowed_hosts)
 cors_origins = ["http://localhost:8000", "http://127.0.0.1:8000"]
@@ -37,8 +37,8 @@ if os.getenv("RENDER"):
     render_service_name = os.getenv("RENDER_SERVICE_NAME", "carris-tracker")
     cors_origins.extend([
         f"https://{render_service_name}.onrender.com",
-        # Add any custom domains here
-        # "https://your-custom-domain.com"
+        # Add custom domains here
+        "https://carris.nelsonandre.pt"
     ])
 
 app.add_middleware(
