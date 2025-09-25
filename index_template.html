@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Monitor de Autocarros Carris - Paragem ESCOLA</title>
+    <title>Monitor de Autocarros Carris</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet"
           href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -333,7 +333,7 @@
 </head>
 <body>
     <div class="header">
-        <h1>🚌 Monitor de Autocarros Carris - Paragem ESCOLA</h1>
+        <h1>🚌 Monitor de Autocarros Carris</h1>
         <p>Rastreamento em tempo real das Linhas 1603, 1636, 1637</p>
         <div class="refresh-countdown" id="refresh-countdown">⟳ 30s</div>
     </div>
@@ -556,7 +556,7 @@
 
             const schedules = direction === 'dona_maria' ? SCHEDULES_DONA_MARIA : SCHEDULES_ESCOLA;
             const targetName = direction === 'dona_maria' ? 'DONA MARIA' : 'ESCOLA';
-            const secondStopName = direction === 'dona_maria' ? 'ESCOLA' : 'R Principal 146';
+            const secondStopName = direction === 'dona_maria' ? 'ESCOLA' : 'DONA MARIA';
 
             // Get current time for sorting
             const now = new Date();
