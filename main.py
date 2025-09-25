@@ -365,9 +365,32 @@ async def fetch_bus_data(direction: str = "escola") -> List[Dict]:
                                 eta_hours = distance / speed_kmh
                                 eta_minutes = eta_hours * 60
 
+                        # Check if bus is exactly at target stop (just arrived)
+                        elif current_sequence == target_sequence:
+                            bus_status = "heading_to_target"  # Still orange, just arrived
+                            color = "#ff8800"  # orange
+
+                            bus_lat = validate_coordinate(bus.get("lat"), "lat")
+                            bus_lon = validate_coordinate(bus.get("lon"), "lon")
+
+                            if bus_lat is None or bus_lon is None:
+                                continue  # Skip buses with invalid coordinates
+
+                            # Calculate distance to the target stop based on direction
+                            if direction == "dona_maria":
+                                target_coords = ADDITIONAL_POINT  # DONA MARIA coordinates
+                            else:
+                                target_coords = TARGET_STOP  # ESCOLA coordinates
+
+                            distance = calculate_distance(
+                                bus_lat, bus_lon,
+                                target_coords["lat"], target_coords["lon"]
+                            )
+                            eta_minutes = 0  # Already arrived
+
                         # Check if bus is between target (110004) and additional point (171577)
                         elif (additional_sequence is not None and
-                              target_sequence <= current_sequence < additional_sequence):
+                              target_sequence < current_sequence < additional_sequence):
                             bus_status = "between_stops"
                             color = "#FFD700"  # regular yellow
 
